@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: survey-app
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app: survey-app
@@ -13,7 +13,7 @@ spec:
         app: survey-app
     spec:
       containers:
-        - name: my-container
+        - name: mycontainer
           image: gcr.io/survey-453423/survey:latest
           imagePullPolicy: Always
           ports:

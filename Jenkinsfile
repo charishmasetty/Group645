@@ -26,10 +26,13 @@ pipeline {
                     gcloud auth activate-service-account --key-file=${GCP_KEY}
                     gcloud config set project ${PROJECT_ID}
                     gcloud auth configure-docker
+                    gcloud container clusters get-credentials ${GKE_CLUSTER} --region ${GKE_REGION}
+                    kubectl apply -f deploy.yaml
 
                     # Build and push the Docker image using buildx
                     docker buildx create --use
-                    docker buildx build --platform linux/amd64 -t ${REGISTRY_URL} --push .
+                    docker buildx build --platform linux/amd64 \
+                        -t gcr.io/survey-453423/survey:latest --push .
                     """
                 }
             }

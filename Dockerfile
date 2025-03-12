@@ -2,7 +2,7 @@
 FROM nginx:latest
 
 # Copy Survey.html to Nginx default root directory
-COPY index.html /usr/share/nginx/html/
+COPY index.html /usr/share/nginx/html/index.html
 
 # Expose port 80 to allow access
 EXPOSE 80

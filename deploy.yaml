@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: survey-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: survey-app
+  template:
+    metadata:
+      labels:
+        app: survey-app
+    spec:
+      containers:
+        - name: my-container
+          image: gcr.io/survey-453423/survey:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: survey-app-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: survey-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80

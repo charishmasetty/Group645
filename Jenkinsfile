@@ -1,6 +1,6 @@
 pipeline {
     agent any
-
+    
     environment {
         PROJECT_ID   = "survey-453423"
         GKE_CLUSTER  = "survey"
@@ -12,41 +12,50 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                // Checkout the code from your GitHub repo (use credentials if needed)
-                git url: 'https://github.com/charishmasetty/Group645.git', branch: 'main', credentialsId: 'github-creds'
+                git url: 'https://github.com/charishmasetty/Group645.git', branch: 'main'
             }
         }
         
-        stage('Build Docker Image') {
+        stage('Deploy YAML First') {
             steps {
-                // Use the GCP key for Docker authentication as well
                 withCredentials([file(credentialsId: 'jenkins-gcp-key', variable: 'GCP_KEY')]) {
                     sh """
-                    # Authenticate with GCP and configure Docker to use these credentials
-                    gcloud auth activate-service-account --key-file=${GCP_KEY}
-                    gcloud config set project ${PROJECT_ID}
-                    gcloud auth configure-docker
-                    gcloud container clusters get-credentials ${GKE_CLUSTER} --region ${GKE_REGION}
-                    kubectl apply -f deploy.yaml
+                      gcloud auth activate-service-account --key-file=${GCP_KEY}
+                      gcloud config set project ${PROJECT_ID}
+                      gcloud container clusters get-credentials ${GKE_CLUSTER} --region ${GKE_REGION}
+                      
+                      # Apply the current manifests
+                      kubectl apply -f deploy.yaml
+                    """
+                }
+            }
+        }
 
-                    # Build and push the Docker image using buildx
-                    docker buildx create --use
-                    docker buildx build --platform linux/amd64 \
-                        -t gcr.io/survey-453423/survey:latest --push .
+        stage('Build & Push Docker Image') {
+            steps {
+                withCredentials([file(credentialsId: 'jenkins-gcp-key', variable: 'GCP_KEY')]) {
+                    sh """
+                      gcloud auth activate-service-account --key-file=${GCP_KEY}
+                      gcloud config set project ${PROJECT_ID}
+                      gcloud auth configure-docker
+
+                      docker buildx create --use
+                      docker buildx build --platform linux/amd64 -t ${REGISTRY_URL} --push .
                     """
                 }
             }
         }
         
-        stage('Deploy to GKE') {
+        stage('Force Rollout Restart') {
             steps {
-                // Use the GCP key again to authenticate with GCP for deployment
                 withCredentials([file(credentialsId: 'jenkins-gcp-key', variable: 'GCP_KEY')]) {
                     sh """
-                    gcloud auth activate-service-account --key-file=${GCP_KEY}
-                    gcloud config set project ${PROJECT_ID}
-                    gcloud container clusters get-credentials ${GKE_CLUSTER} --region ${GKE_REGION}
-                    kubectl apply -f deploy.yaml
+                      gcloud auth activate-service-account --key-file=${GCP_KEY}
+                      gcloud config set project ${PROJECT_ID}
+                      gcloud container clusters get-credentials ${GKE_CLUSTER} --region ${GKE_REGION}
+
+                      # Force a new rollout so pods pull the newly built image
+                      kubectl rollout restart deployment survey-app
                     """
                 }
             }

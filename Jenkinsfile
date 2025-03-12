@@ -1,32 +1,33 @@
 pipeline {
     agent any
-    
+
     environment {
-        // Update these to match your GCP setup
         PROJECT_ID   = "survey-453423"
         GKE_CLUSTER  = "survey"
         GKE_REGION   = "us-central1"
-        
-        // Docker image name
         IMAGE_NAME   = "survey"
-        
-        // Full image URL in GCR
         REGISTRY_URL = "gcr.io/${PROJECT_ID}/${IMAGE_NAME}:latest"
     }
     
     stages {
         stage('Checkout Code') {
             steps {
-                // Pull code from your GitHub repository
-                git url: 'https://github.com/charishmasetty/Group645', branch: 'main'
+                // Checkout the code from your GitHub repo (use credentials if needed)
+                git url: 'https://github.com/charishmasetty/Group645.git', branch: 'main', credentialsId: 'github-creds'
             }
         }
         
         stage('Build Docker Image') {
             steps {
-                script {
-                    // Build and push your Docker image for linux/amd64
+                // Use the GCP key for Docker authentication as well
+                withCredentials([file(credentialsId: 'jenkins-gcp-key', variable: 'GCP_KEY')]) {
                     sh """
+                    # Authenticate with GCP and configure Docker to use these credentials
+                    gcloud auth activate-service-account --key-file=${GCP_KEY}
+                    gcloud config set project ${PROJECT_ID}
+                    gcloud auth configure-docker
+
+                    # Build and push the Docker image using buildx
                     docker buildx create --use
                     docker buildx build --platform linux/amd64 -t ${REGISTRY_URL} --push .
                     """
@@ -35,19 +36,19 @@ pipeline {
         }
         
         stage('Deploy to GKE') {
-        steps {
-            withCredentials([file(credentialsId: 'jenkins-gcp-key', variable: 'GCP_KEY')]) {
-                sh """
-                gcloud auth activate-service-account --key-file=${GCP_KEY}
-                gcloud config set project survey-453423
-                gcloud container clusters get-credentials survey --region us-central1
-                kubectl apply -f deploy.yaml
-                """
+            steps {
+                // Use the GCP key again to authenticate with GCP for deployment
+                withCredentials([file(credentialsId: 'jenkins-gcp-key', variable: 'GCP_KEY')]) {
+                    sh """
+                    gcloud auth activate-service-account --key-file=${GCP_KEY}
+                    gcloud config set project ${PROJECT_ID}
+                    gcloud container clusters get-credentials ${GKE_CLUSTER} --region ${GKE_REGION}
+                    kubectl apply -f deploy.yaml
+                    """
+                }
             }
         }
     }
-
-    }   
     
     post {
         success {

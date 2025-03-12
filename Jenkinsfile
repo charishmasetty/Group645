@@ -1,33 +1,56 @@
 pipeline {
     agent any
-    environment {
-        DOCKER_IMAGE = "gcr.io/warm-drive-453300-q6/survey-tomcat:v1"
-        KUBERNETES_DEPLOYMENT = "survey-app"
-        CONTAINER_NAME = "survey-tomcat"
-    }
-    stages {
-        stage('Clone Repository') {
-    steps {
-        git branch: 'main', credentialsId: 'github-credentials', url: 'https://github.com/charishmasetty/Group645.git'
-    }
-}
 
+    environment {
+        PROJECT_ID    = "survey-453423"
+        GKE_CLUSTER   = "survey"              // Cluster name is "survey"
+        GKE_REGION    = "us-central1"
+        IMAGE_NAME    = "survey"
+        REGISTRY_URL  = "gcr.io/survey-453423/survey:latest"
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                // Checkout the code from your GitHub repository
+                git url: 'https://github.com/charishmasetty/Group645', branch: 'main'
+            }
+        }
+        
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t $DOCKER_IMAGE ."
+                script {
+                    // Create a new builder instance and build the Docker image for linux/amd64, then push to GCR
+                    sh """
+                    docker buildx create --use
+                    docker buildx build --platform linux/amd64 -t ${REGISTRY_URL} --push .
+                    """
+                }
             }
         }
-        stage('Push to Google Container Registry') {
+        
+        stage('Deploy to GKE') {
             steps {
-                sh "docker push $DOCKER_IMAGE"
+                script {
+                    // Activate your GCP service account using the key file (ensure gcp-key.json is added as a secret file credential)
+                    sh """
+                    gcloud auth activate-service-account --key-file=${WORKSPACE}/gcp-key.json
+                    gcloud config set project ${PROJECT_ID}
+                    gcloud container clusters get-credentials ${GKE_CLUSTER} --region ${GKE_REGION}
+                    """
+                    // Deploy your Kubernetes manifest (deploy.yaml should be present in your repository)
+                    sh "kubectl apply -f deploy.yaml"
+                }
             }
         }
-        stage('Deploy to Kubernetes') {
-            steps {
-                sh """
-                kubectl set image deployment/$KUBERNETES_DEPLOYMENT $CONTAINER_NAME=$DOCKER_IMAGE --record
-                """
-            }
+    }
+    
+    post {
+        success {
+            echo 'CI/CD Pipeline completed successfully!'
+        }
+        failure {
+            echo 'CI/CD Pipeline failed. Check logs for details.'
         }
     }
 }

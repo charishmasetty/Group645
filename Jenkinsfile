@@ -35,23 +35,19 @@ pipeline {
         }
         
         stage('Deploy to GKE') {
-            steps {
-                script {
-                    // Authenticate with GCP using the service account JSON
-                    // Make sure you have a Jenkins credential with ID "gcp-key.json"
-                    // that you load into the workspace or reference directly
-                    sh """
-                    gcloud auth activate-service-account --key-file=\${WORKSPACE}/gcp-key.json
-                    gcloud config set project ${PROJECT_ID}
-                    gcloud container clusters get-credentials ${GKE_CLUSTER} --region ${GKE_REGION}
-                    
-                    // Apply the Kubernetes deployment manifest
-                    kubectl apply -f deploy.yaml
-                    """
-                }
+        steps {
+            withCredentials([file(credentialsId: 'gcp-key', variable: 'GCP_KEY')]) {
+                sh """
+                gcloud auth activate-service-account --key-file=${GCP_KEY}
+                gcloud config set project survey-453423
+                gcloud container clusters get-credentials survey --region us-central1
+                kubectl apply -f deploy.yaml
+                """
             }
         }
     }
+
+    }   
     
     post {
         success {

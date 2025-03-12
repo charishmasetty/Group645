@@ -36,7 +36,7 @@ pipeline {
         
         stage('Deploy to GKE') {
         steps {
-            withCredentials([file(credentialsId: 'gcp-key', variable: 'GCP_KEY')]) {
+            withCredentials([file(credentialsId: 'jenkins-gcp-key', variable: 'GCP_KEY')]) {
                 sh """
                 gcloud auth activate-service-account --key-file=${GCP_KEY}
                 gcloud config set project survey-453423
